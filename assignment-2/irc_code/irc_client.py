@@ -13,6 +13,7 @@ Description:
 import asyncio
 import getopt
 import logging
+import socket
 import sys
 
 import patterns
@@ -105,7 +106,7 @@ def parse():
         ["help", "port=", "server="],
     )
     port = "17573"
-    server = "default"
+    server = "127.0.0.1"
     for o, a in options:
         if o in ("-h", "--help"):
             print(usage)
@@ -118,11 +119,30 @@ def parse():
             print(f"server option entered: {server}")
     if len(options) > 3:
         raise SystemExit(usage)
-    return server, port
+    return server, int(port)
+
+
+def client_program(host, port):
+
+    client_socket = socket.socket()  # instantiate
+    client_socket.connect((host, port))  # connect to the server
+
+    message = input(" -> ")  # take input
+
+    while message.lower().strip() != "bye":
+        client_socket.send(message.encode())  # send message
+        data = client_socket.recv(1024).decode()  # receive response
+
+        print("Received from server: " + data)  # show in terminal
+
+        message = input(" -> ")  # again take input
+
+    client_socket.close()  # close the connection
 
 
 if __name__ == "__main__":
     # Parse your command line arguments here
     server, port = parse()
+    client_program(server, port)
     args = None
     main(args)
