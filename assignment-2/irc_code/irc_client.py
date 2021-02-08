@@ -11,7 +11,9 @@ Description:
 
 """
 import asyncio
+import getopt
 import logging
+import sys
 
 import patterns
 import view
@@ -89,7 +91,38 @@ def main(args):
     client.close()
 
 
+def parse():
+    usage = """usage: irc_client.py [-h] [--server SERVER] [--port PORT]
+
+    optional arguments:
+    -h, --help \t\tshow this help message and exit
+    --server SERVER \ttarget server to initiate a connection to
+    --port PORT \ttarget port to use"""
+
+    options, _ = getopt.getopt(
+        sys.argv[1:],
+        "hp:s:",
+        ["help", "port=", "server="],
+    )
+    port = "17573"
+    server = "default"
+    for o, a in options:
+        if o in ("-h", "--help"):
+            print(usage)
+            sys.exit()
+        if o in ("-p", "--port"):
+            port = a
+            print(f"port option entered: {port}")
+        if o in ("-s", "--server"):
+            server = a
+            print(f"server option entered: {server}")
+    if len(options) > 3:
+        raise SystemExit(usage)
+    return server, port
+
+
 if __name__ == "__main__":
     # Parse your command line arguments here
+    server, port = parse()
     args = None
     main(args)
