@@ -2,6 +2,14 @@ import getopt
 import socket
 import sys
 
+import patterns
+
+
+class IRCClient(patterns.Subscriber):
+    def __init__(self, port):
+        super().__init__()
+        self.port = port
+
 
 def server_program(port):
     host = "127.0.0.1"

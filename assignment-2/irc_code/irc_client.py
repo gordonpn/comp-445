@@ -24,10 +24,12 @@ logger = logging.getLogger()
 
 
 class IRCClient(patterns.Subscriber):
-    def __init__(self):
+    def __init__(self, port, server):
         super().__init__()
         self.username = str()
         self._run = True
+        self.port = port
+        self.server = server
 
     def set_view(self, view):
         self.view = view
@@ -35,11 +37,11 @@ class IRCClient(patterns.Subscriber):
     def update(self, msg):
         # Will need to modify this
         if not isinstance(msg, str):
-            raise TypeError(f"Update argument needs to be a string")
-        elif not len(msg):
+            raise TypeError("Update argument needs to be a string")
+        if len(msg) == 0:
             # Empty string
             return
-        logger.info(f"IRCClient.update -> msg: {msg}")
+        logger.info("IRCClient.update -> msg: %s", msg)
         self.process_input(msg)
 
     def process_input(self, msg):
@@ -63,20 +65,19 @@ class IRCClient(patterns.Subscriber):
 
     def close(self):
         # Terminate connection
-        logger.debug(f"Closing IRC Client object")
-        pass
+        logger.debug("Closing IRC Client object")
 
 
-def main(args):
+def main(port, server):
     # Pass your arguments where necessary
-    client = IRCClient()
-    logger.info(f"Client object created")
+    client = IRCClient(port, server)
+    logger.info("Client object created")
     with view.View() as v:
-        logger.info(f"Entered the context of a View object")
+        logger.info("Entered the context of a View object")
         client.set_view(v)
-        logger.debug(f"Passed View object to IRC Client")
+        logger.debug("Passed View object to IRC Client")
         v.add_subscriber(client)
-        logger.debug(f"IRC Client is subscribed to the View (to receive user input)")
+        logger.debug("IRC Client is subscribed to the View (to receive user input)")
 
         async def inner_run():
             await asyncio.gather(
@@ -87,8 +88,8 @@ def main(args):
 
         try:
             asyncio.run(inner_run())
-        except KeyboardInterrupt as e:
-            logger.debug(f"Signifies end of process")
+        except KeyboardInterrupt:
+            logger.debug("Signifies end of process")
     client.close()
 
 
@@ -119,7 +120,7 @@ def parse():
             print(f"server option entered: {server}")
     if len(options) > 3:
         raise SystemExit(usage)
-    return server, int(port)
+    return int(port), server
 
 
 def client_program(host, port):
@@ -143,6 +144,5 @@ def client_program(host, port):
 if __name__ == "__main__":
     # Parse your command line arguments here
     server, port = parse()
-    client_program(server, port)
-    args = None
-    main(args)
+    # client_program(server, port)
+    main(port, server)

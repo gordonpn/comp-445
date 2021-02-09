@@ -15,7 +15,7 @@ import abc
 
 class Publisher:
     def __init__(self):
-        self.subscribers = list()
+        self.subscribers = []
 
     def add_subscriber(self, s):
         self.subscribers.append(s)
