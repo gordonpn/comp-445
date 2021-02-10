@@ -1,39 +1,82 @@
+import asyncio
 import getopt
+import logging
 import socket
 import sys
 
 import patterns
+import view
+
+logging.basicConfig(filename="view.log", level=logging.DEBUG)
+logger = logging.getLogger()
 
 
-class IRCClient(patterns.Subscriber):
-    def __init__(self, port):
+class IRCServer(patterns.Subscriber):
+    def __init__(self, port, host):
         super().__init__()
+        self.username = "irc_server"
         self.port = port
+        self.host = host
+        self.socket = socket.socket()
+        # self.socket.setblocking(False)
+
+    def set_view(self, view):
+        self.view = view
+
+    def update(self, msg):
+        if not isinstance(msg, str):
+            raise TypeError("Update argument must be a string")
+        if len(msg) == 0:
+            return
+        logger.info("IRCServer.update -> msg: %s", msg)
+        self.process_input(msg)
+
+    def process_input(self, msg):
+        self.add_msg(msg)
+        if msg.lower().startswith("/quit"):
+            raise KeyboardInterrupt
+        # TODO server send message
+
+    def add_msg(self, msg):
+        self.view.add_msg(self.username, msg)
+
+    async def run(self):
+        self.socket.bind((self.host, self.port))
+        self.add_msg(f"Accepting connections on {self.host}:{self.port}")
+        self.socket.listen(10)
+        client_socket, client_address = self.socket.accept()
+        self.view.add_msg(self.username, "Connection from: " + str(client_address))
+
+        while True:
+            client_input = client_socket.recv(1024).decode()
+            self.view.add_msg(client_address, str(client_input))
+            # TODO handle when client disconnects
+            # TODO handle more than 1 connection
+            # TODO propagate message to other clients
+
+    def close(self):
+        self.socket.close()
 
 
-def server_program(port):
-    host = "127.0.0.1"
+def main(port, host):
+    server = IRCServer(port, host)
 
-    server_socket = socket.socket()  # get instance
-    # look closely. The bind() function takes tuple as argument
-    server_socket.bind((host, port))  # bind host address and port together
+    with view.View() as v:
+        server.set_view(v)
+        v.add_subscriber(server)
 
-    # configure how many client the server can listen simultaneously
-    print(f"Accepting connections on {host}:{port}")
-    server_socket.listen(2)
-    conn, address = server_socket.accept()  # accept new connection
-    print("Connection from: " + str(address))
-    while True:
-        # receive data stream. it won't accept data packet greater than 1024 bytes
-        data = conn.recv(1024).decode()
-        if not data:
-            # if data is not received break
-            break
-        print("from connected user: " + str(data))
-        data = input(" -> ")
-        conn.send(data.encode())  # send data to the client
+        async def inner_run():
+            await asyncio.gather(
+                v.run(),
+                server.run(),
+                return_exceptions=True,
+            )
 
-    conn.close()  # close the connection
+        try:
+            asyncio.run(inner_run())
+        except KeyboardInterrupt:
+            server.close()
+    server.close()
 
 
 def parse():
@@ -62,6 +105,5 @@ def parse():
 
 
 if __name__ == "__main__":
-    # Parse your command line arguments here
     port = parse()
-    server_program(port)
+    main(port, "0.0.0.0")

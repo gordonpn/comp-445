@@ -30,6 +30,8 @@ class IRCClient(patterns.Subscriber):
         self._run = True
         self.port = port
         self.server = server
+        self.socket = socket.socket()
+        # self.socket.setblocking(False)
 
     def set_view(self, view):
         self.view = view
@@ -50,6 +52,7 @@ class IRCClient(patterns.Subscriber):
         if msg.lower().startswith("/quit"):
             # Command that leads to the closure of the process
             raise KeyboardInterrupt
+        self.socket.send(msg.encode())
 
     def add_msg(self, msg):
         self.view.add_msg(self.username, msg)
@@ -58,14 +61,21 @@ class IRCClient(patterns.Subscriber):
         """
         Driver of your IRC Client
         """
+        self.socket.connect((self.server, self.port))
+        self.add_msg("Connection to server successful")
+
+        # TODO receive messages from server
+        # while True:
+        #     server_input = self.socket.recv(1024).decode()
+        #     self.view.add_msg("", server_input)
         # Remove this section in your code, simply for illustration purposes
-        for x in range(10):
-            self.add_msg(f"call after View.loop: {x}")
-            await asyncio.sleep(2)
+        # for x in range(10):
+        #     self.add_msg(f"call after View.loop: {x}")
+        #     await asyncio.sleep(2)
 
     def close(self):
-        # Terminate connection
         logger.debug("Closing IRC Client object")
+        self.socket.close()
 
 
 def main(port, server):
@@ -90,6 +100,7 @@ def main(port, server):
             asyncio.run(inner_run())
         except KeyboardInterrupt:
             logger.debug("Signifies end of process")
+            client.close()
     client.close()
 
 
@@ -107,7 +118,7 @@ def parse():
         ["help", "port=", "server="],
     )
     port = "17573"
-    server = "127.0.0.1"
+    server = "0.0.0.0"
     for o, a in options:
         if o in ("-h", "--help"):
             print(usage)
@@ -120,29 +131,10 @@ def parse():
             print(f"server option entered: {server}")
     if len(options) > 3:
         raise SystemExit(usage)
-    return int(port), server
-
-
-def client_program(host, port):
-
-    client_socket = socket.socket()  # instantiate
-    client_socket.connect((host, port))  # connect to the server
-
-    message = input(" -> ")  # take input
-
-    while message.lower().strip() != "bye":
-        client_socket.send(message.encode())  # send message
-        data = client_socket.recv(1024).decode()  # receive response
-
-        print("Received from server: " + data)  # show in terminal
-
-        message = input(" -> ")  # again take input
-
-    client_socket.close()  # close the connection
+    return server, int(port)
 
 
 if __name__ == "__main__":
     # Parse your command line arguments here
     server, port = parse()
-    # client_program(server, port)
     main(port, server)
