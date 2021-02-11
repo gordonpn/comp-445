@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import select
 import socket
 
 from args_parser import parse_server
@@ -11,39 +12,47 @@ logger = logging.getLogger()
 
 
 class IRCServer:
+    # TODO refactor to use observer pattern
     def __init__(self, port, host):
         super().__init__()
-        self.username = "irc_server"
         self.port = port
         self.host = host
         self.socket = socket.socket()
         self.client_sockets = []
-        # self.socket.setblocking(False)
 
     async def run(self):
+        self.socket.setblocking(False)
         self.socket.bind((self.host, self.port))
         print(f"Accepting connections on {self.host}:{self.port}")
         self.socket.listen(10)
-        client_socket, client_address = self.socket.accept()
-        print(self.username, "Connection from: " + str(client_address))
-        self.client_sockets.append(client_socket)
+
+        inputs = [self.socket]
+        outputs = []
 
         while True:
-            client_input = client_socket.recv(1024).decode()
-            if not client_input:
-                print("Socket connection broken")
-                break
-            decoded = json.loads(client_input)
-            packet = Packet(**decoded)
-            print(f"{packet.username=}, {packet.message=}")
-            self.propagate(packet)
+            readable, _, _ = select.select(inputs, outputs, inputs)
 
-            # TODO handle when client disconnects
-            # TODO handle more than 1 connection
-            # TODO propagate message to other clients
+            for _socket in readable:
+                if _socket is self.socket:
+                    client_socket, client_address = _socket.accept()
+                    print(f"Client connected: {client_address}")
+                    inputs.append(client_socket)
+                    self.client_sockets.append((client_socket, client_address))
+                else:
+                    client_input = _socket.recv(1024).decode()
+                    if client_input:
+                        decoded = json.loads(client_input)
+                        packet = Packet(**decoded)
+                        print(f"[{packet.username}]: {packet.message}")
+                        self.propagate(packet)
+                    else:
+                        print(f"Client disconnected: {_socket.getpeername()}")
+                        inputs.remove(_socket)
+                        self.client_sockets.remove((_socket, _socket.getpeername()))
+                        _socket.close()
 
     def propagate(self, packet):
-        for client_socket in self.client_sockets:
+        for client_socket, _ in self.client_sockets:
             data = json.dumps(packet.__dict__)
             client_socket.send(data.encode())
 
