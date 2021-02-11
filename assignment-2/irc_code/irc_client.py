@@ -11,19 +11,20 @@ Description:
 
 """
 import asyncio
-import getopt
+import json
 import logging
 import socket
-import sys
 
-import patterns
-import view
+from args_parser import parse_client
+from packet_type import Packet
+from patterns import Subscriber
+from view import View
 
 logging.basicConfig(filename="view.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 
-class IRCClient(patterns.Subscriber):
+class IRCClient(Subscriber):
     def __init__(self, port, server):
         super().__init__()
         self.username = str()
@@ -31,47 +32,51 @@ class IRCClient(patterns.Subscriber):
         self.port = port
         self.server = server
         self.socket = socket.socket()
+        self.loop = asyncio.get_event_loop()
         # self.socket.setblocking(False)
 
     def set_view(self, view):
         self.view = view
 
     def update(self, msg):
-        # Will need to modify this
         if not isinstance(msg, str):
             raise TypeError("Update argument needs to be a string")
         if len(msg) == 0:
-            # Empty string
             return
         logger.info("IRCClient.update -> msg: %s", msg)
         self.process_input(msg)
 
     def process_input(self, msg):
-        # Will need to modify this
-        self.add_msg(msg)
         if msg.lower().startswith("/quit"):
-            # Command that leads to the closure of the process
+            self.loop.close()
             raise KeyboardInterrupt
-        self.socket.send(msg.encode())
+        if msg.lower().startswith("/username"):
+            self.username = msg.replace("/username ", "")
+            return
+        packet = Packet(self.username, msg)
+        data = json.dumps(packet.__dict__)
+        self.socket.send(data.encode())
 
     def add_msg(self, msg):
         self.view.add_msg(self.username, msg)
 
     async def run(self):
-        """
-        Driver of your IRC Client
-        """
         self.socket.connect((self.server, self.port))
         self.add_msg("Connection to server successful")
+        self.add_msg("Use command /username to set your username")
 
-        # TODO receive messages from server
-        # while True:
-        #     server_input = self.socket.recv(1024).decode()
-        #     self.view.add_msg("", server_input)
-        # Remove this section in your code, simply for illustration purposes
-        # for x in range(10):
-        #     self.add_msg(f"call after View.loop: {x}")
-        #     await asyncio.sleep(2)
+        self.loop.run_in_executor(None, self.listen_server)
+
+    def listen_server(self):
+        while True:
+            server_input = self.socket.recv(1024).decode()
+            if not server_input:
+                self.view.add_msg("", "Connection terminated by server")
+                return
+
+            decoded = json.loads(server_input)
+            packet = Packet(**decoded)
+            self.view.add_msg(packet.username, packet.message)
 
     def close(self):
         logger.debug("Closing IRC Client object")
@@ -79,10 +84,9 @@ class IRCClient(patterns.Subscriber):
 
 
 def main(port, server):
-    # Pass your arguments where necessary
     client = IRCClient(port, server)
     logger.info("Client object created")
-    with view.View() as v:
+    with View() as v:
         logger.info("Entered the context of a View object")
         client.set_view(v)
         logger.debug("Passed View object to IRC Client")
@@ -100,41 +104,9 @@ def main(port, server):
             asyncio.run(inner_run())
         except KeyboardInterrupt:
             logger.debug("Signifies end of process")
-            client.close()
     client.close()
 
 
-def parse():
-    usage = """usage: irc_client.py [-h] [--server SERVER] [--port PORT]
-
-    optional arguments:
-    -h, --help \t\tshow this help message and exit
-    --server SERVER \ttarget server to initiate a connection to
-    --port PORT \ttarget port to use"""
-
-    options, _ = getopt.getopt(
-        sys.argv[1:],
-        "hp:s:",
-        ["help", "port=", "server="],
-    )
-    port = "17573"
-    server = "0.0.0.0"
-    for o, a in options:
-        if o in ("-h", "--help"):
-            print(usage)
-            sys.exit()
-        if o in ("-p", "--port"):
-            port = a
-            print(f"port option entered: {port}")
-        if o in ("-s", "--server"):
-            server = a
-            print(f"server option entered: {server}")
-    if len(options) > 3:
-        raise SystemExit(usage)
-    return server, int(port)
-
-
 if __name__ == "__main__":
-    # Parse your command line arguments here
-    server, port = parse()
+    server, port = parse_client()
     main(port, server)

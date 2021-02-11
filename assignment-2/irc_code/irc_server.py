@@ -1,58 +1,51 @@
 import asyncio
-import getopt
+import json
 import logging
 import socket
-import sys
 
-import patterns
-import view
+from args_parser import parse_server
+from packet_type import Packet
 
 logging.basicConfig(filename="view.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 
-class IRCServer(patterns.Subscriber):
+class IRCServer:
     def __init__(self, port, host):
         super().__init__()
         self.username = "irc_server"
         self.port = port
         self.host = host
         self.socket = socket.socket()
+        self.client_sockets = []
         # self.socket.setblocking(False)
-
-    def set_view(self, view):
-        self.view = view
-
-    def update(self, msg):
-        if not isinstance(msg, str):
-            raise TypeError("Update argument must be a string")
-        if len(msg) == 0:
-            return
-        logger.info("IRCServer.update -> msg: %s", msg)
-        self.process_input(msg)
-
-    def process_input(self, msg):
-        self.add_msg(msg)
-        if msg.lower().startswith("/quit"):
-            raise KeyboardInterrupt
-        # TODO server send message
-
-    def add_msg(self, msg):
-        self.view.add_msg(self.username, msg)
 
     async def run(self):
         self.socket.bind((self.host, self.port))
-        self.add_msg(f"Accepting connections on {self.host}:{self.port}")
+        print(f"Accepting connections on {self.host}:{self.port}")
         self.socket.listen(10)
         client_socket, client_address = self.socket.accept()
-        self.view.add_msg(self.username, "Connection from: " + str(client_address))
+        print(self.username, "Connection from: " + str(client_address))
+        self.client_sockets.append(client_socket)
 
         while True:
             client_input = client_socket.recv(1024).decode()
-            self.view.add_msg(client_address, str(client_input))
+            if not client_input:
+                print("Socket connection broken")
+                break
+            decoded = json.loads(client_input)
+            packet = Packet(**decoded)
+            print(f"{packet.username=}, {packet.message=}")
+            self.propagate(packet)
+
             # TODO handle when client disconnects
             # TODO handle more than 1 connection
             # TODO propagate message to other clients
+
+    def propagate(self, packet):
+        for client_socket in self.client_sockets:
+            data = json.dumps(packet.__dict__)
+            client_socket.send(data.encode())
 
     def close(self):
         self.socket.close()
@@ -61,49 +54,19 @@ class IRCServer(patterns.Subscriber):
 def main(port, host):
     server = IRCServer(port, host)
 
-    with view.View() as v:
-        server.set_view(v)
-        v.add_subscriber(server)
+    async def inner_run():
+        await asyncio.gather(
+            server.run(),
+            return_exceptions=True,
+        )
 
-        async def inner_run():
-            await asyncio.gather(
-                v.run(),
-                server.run(),
-                return_exceptions=True,
-            )
-
-        try:
-            asyncio.run(inner_run())
-        except KeyboardInterrupt:
-            server.close()
+    try:
+        asyncio.run(inner_run())
+    except KeyboardInterrupt:
+        print("\nGraceful server shutdown through SIGINT")
     server.close()
 
 
-def parse():
-    usage = """usage: irc_server.py [-h] [--port PORT]
-
-    optional arguments:
-    -h, --help \t\tshow this help message and exit
-    --port PORT \ttarget port to use"""
-
-    options, _ = getopt.getopt(
-        sys.argv[1:],
-        "hp:",
-        ["help", "port="],
-    )
-    port = "17573"
-    for o, a in options:
-        if o in ("-h", "--help"):
-            print(usage)
-            sys.exit()
-        if o in ("-p", "--port"):
-            port = a
-            print(f"port option entered: {port}")
-    if len(options) > 2:
-        raise SystemExit(usage)
-    return int(port)
-
-
 if __name__ == "__main__":
-    port = parse()
+    port = parse_server()
     main(port, "0.0.0.0")
