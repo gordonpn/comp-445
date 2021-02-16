@@ -25,6 +25,7 @@ logger = logging.getLogger()
 
 
 class IRCClient(Subscriber):
+    # TODO change the message format being sent
     def __init__(self, port, server):
         super().__init__()
         self.username = str()

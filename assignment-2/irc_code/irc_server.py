@@ -13,6 +13,7 @@ logger = logging.getLogger()
 
 
 class IRCServer(Publisher):
+    # TODO change how to parse the message receive
     def __init__(self, port, host):
         super().__init__()
         self.port = port
