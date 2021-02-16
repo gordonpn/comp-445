@@ -95,7 +95,7 @@ def main(port, server):
         logger.info("Entered the context of a View object")
         client.set_view(v)
         logger.debug("Passed View object to IRC Client")
-        v.add_subscriber(client)
+        v.add_subscriber("", client)
         logger.debug("IRC Client is subscribed to the View (to receive user input)")
 
         async def inner_run():

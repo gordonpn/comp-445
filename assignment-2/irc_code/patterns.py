@@ -15,20 +15,20 @@ import abc
 
 class Publisher:
     def __init__(self):
-        self.subscribers = []
+        self.subscribers = {}
 
-    def add_subscriber(self, s):
-        self.subscribers.append(s)
+    def add_subscriber(self, k, s):
+        self.subscribers[k] = s
 
-    def rm_subscriber(self, s):
+    def rm_subscriber(self, k):
         try:
-            self.subscribers.remove(s)
+            self.subscribers.pop(k, None)
         except ValueError:
             # not present
             pass
 
     def notify(self, msg):
-        for s in self.subscribers:
+        for _, s in self.subscribers.items():
             if hasattr(s, "update"):
                 s.update(msg)
 

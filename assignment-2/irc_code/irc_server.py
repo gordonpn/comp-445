@@ -6,19 +6,18 @@ import socket
 
 from args_parser import parse_server
 from packet_type import Packet
+from patterns import Publisher, Subscriber
 
 logging.basicConfig(filename="view.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 
-class IRCServer:
-    # TODO refactor to use observer pattern
+class IRCServer(Publisher):
     def __init__(self, port, host):
         super().__init__()
         self.port = port
         self.host = host
         self.socket = socket.socket()
-        self.client_sockets = []
 
     async def run(self):
         self.socket.setblocking(False)
@@ -37,27 +36,34 @@ class IRCServer:
                     client_socket, client_address = _socket.accept()
                     print(f"Client connected: {client_address}")
                     inputs.append(client_socket)
-                    self.client_sockets.append((client_socket, client_address))
+                    self.add_subscriber(
+                        client_address, IRCSubscriber(client_socket, client_address)
+                    )
                 else:
                     client_input = _socket.recv(1024).decode()
                     if client_input:
                         decoded = json.loads(client_input)
                         packet = Packet(**decoded)
                         print(f"[{packet.username}]: {packet.message}")
-                        self.propagate(packet)
+                        self.notify(packet)
                     else:
                         print(f"Client disconnected: {_socket.getpeername()}")
                         inputs.remove(_socket)
-                        self.client_sockets.remove((_socket, _socket.getpeername()))
+                        self.rm_subscriber(_socket.getpeername())
                         _socket.close()
-
-    def propagate(self, packet):
-        for client_socket, _ in self.client_sockets:
-            data = json.dumps(packet.__dict__)
-            client_socket.send(data.encode())
 
     def close(self):
         self.socket.close()
+
+
+class IRCSubscriber(Subscriber):
+    def __init__(self, _socket, address):
+        self._socket = _socket
+        self.address = address
+
+    def update(self, msg):
+        data = json.dumps(msg.__dict__)
+        self._socket.send(data.encode())
 
 
 def main(port, host):
