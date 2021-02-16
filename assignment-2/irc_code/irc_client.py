@@ -28,12 +28,12 @@ class IRCClient(Subscriber):
     def __init__(self, port, server):
         super().__init__()
         self.username = str()
+        self.registered = False
         self._run = True
         self.port = port
         self.server = server
         self.socket = socket.socket()
         self.loop = asyncio.get_event_loop()
-        # self.socket.setblocking(False)
 
     def set_view(self, view):
         self.view = view
@@ -50,8 +50,11 @@ class IRCClient(Subscriber):
         if msg.lower().startswith("/quit"):
             self.loop.close()
             raise KeyboardInterrupt
-        if msg.lower().startswith("/username"):
-            self.username = msg.replace("/username ", "")
+        if msg.lower().startswith("/nick"):
+            self.username = msg.replace("/nick ", "")
+            if not self.registered:
+                self.connect()
+                self.registered = True
             return
         packet = Packet(self.username, msg)
         data = json.dumps(packet.__dict__)
@@ -60,12 +63,14 @@ class IRCClient(Subscriber):
     def add_msg(self, msg):
         self.view.add_msg(self.username, msg)
 
-    async def run(self):
+    def connect(self):
         self.socket.connect((self.server, self.port))
         self.add_msg("Connection to server successful")
-        self.add_msg("Use command /username to set your username")
 
         self.loop.run_in_executor(None, self.listen_server)
+
+    async def run(self):
+        self.add_msg("Use command /nick to set your nickname")
 
     def listen_server(self):
         while True:
