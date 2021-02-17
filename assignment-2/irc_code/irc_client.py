@@ -25,7 +25,10 @@ logger = logging.getLogger()
 
 
 class IRCClient(Subscriber):
-    # TODO change the message format being sent
+    # TODO change how to parse the message receive according to RFC 1459
+    # TODO Proper initialization of IRC session
+    # TODO Appropriate server replies
+    # TODO Handle nickname collisions
     def __init__(self, port, server):
         super().__init__()
         self.username = str()

@@ -11,3 +11,5 @@ pip install -r requirements.dev.txt
 ```
 
 You must start the irc server before starting any irc clients.
+
+<!-- TODO Design description -->
