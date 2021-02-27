@@ -5,7 +5,6 @@ import select
 import socket
 
 from args_parser import parse_server
-from packet_type import Packet
 from patterns import Publisher, Subscriber
 
 logging.basicConfig(filename="view.log", level=logging.DEBUG)
@@ -18,6 +17,7 @@ class IRCServer(Publisher):
         self.port = port
         self.host = host
         self.socket = socket.socket()
+        self.connected_users = {}
 
     async def run(self):
         self.socket.setblocking(False)
@@ -28,9 +28,11 @@ class IRCServer(Publisher):
         inputs = [self.socket]
         outputs = []
 
+        self.start_communications(inputs, outputs)
+
+    def start_communications(self, inputs, outputs):
         while True:
             readable, _, _ = select.select(inputs, outputs, inputs)
-
             for _socket in readable:
                 if _socket is self.socket:
                     client_socket, client_address = _socket.accept()
@@ -42,15 +44,35 @@ class IRCServer(Publisher):
                 else:
                     client_input = _socket.recv(1024).decode()
                     if client_input:
-                        decoded = json.loads(client_input)
-                        packet = Packet(**decoded)
-                        print(f"[{packet.username}]: {packet.message}")
-                        self.notify(packet)
+                        self.parse_msg_from_client(_socket, client_input)
                     else:
                         print(f"Client disconnected: {_socket.getpeername()}")
                         inputs.remove(_socket)
                         self.rm_subscriber(_socket.getpeername())
                         _socket.close()
+
+    def parse_msg_from_client(self, _socket, client_input):
+        print(f'Client on port: "{_socket.getpeername()[1]} {client_input}"')
+        if client_input.startswith("/nick"):
+            nick = client_input.replace("/nick", "").strip()
+            print(f"{nick=}")
+            if nick in self.connected_users.values():
+                _socket.send(f":server 433 * {nick} :Nickname already in use".encode())
+            else:
+                _socket.send(
+                    (
+                        f":server 001 {nick} :Welcome to the Internet Relay Network {nick}! "
+                        "You are connected to the #global channel."
+                    ).encode()
+                )
+                self.connected_users[_socket.getpeername()[1]] = nick
+        elif _socket.getpeername()[1] not in self.connected_users:
+            _socket.send(":server 431 * * :You have not set a nickname".encode())
+        # TODO parse if it's a public message
+        # decoded = json.loads(client_input)
+        # packet = Packet(**decoded)
+        # print(f"[{packet.username}]: {packet.message}")
+        # self.notify(packet)
 
     def close(self):
         self.socket.close()

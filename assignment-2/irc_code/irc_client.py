@@ -11,12 +11,10 @@ Description:
 
 """
 import asyncio
-import json
 import logging
 import socket
 
 from args_parser import parse_client
-from packet_type import Packet
 from patterns import Subscriber
 from view import View
 
@@ -28,7 +26,6 @@ class IRCClient(Subscriber):
     # TODO change how to parse the message receive according to RFC 1459
     # TODO Proper initialization of IRC session
     # TODO Appropriate server replies
-    # TODO Handle nickname collisions
     def __init__(self, port, server):
         super().__init__()
         self.username = str()
@@ -55,14 +52,18 @@ class IRCClient(Subscriber):
             self.loop.close()
             raise KeyboardInterrupt
         if msg.lower().startswith("/nick"):
-            self.username = msg.replace("/nick ", "")
-            if not self.registered:
-                self.connect()
-                self.registered = True
+            if len(msg) <= 6:
+                self.add_msg("You have not specified a nickname")
+                return
+            self.socket.send(msg.lower().strip().encode())
             return
-        packet = Packet(self.username, msg)
-        data = json.dumps(packet.__dict__)
-        self.socket.send(data.encode())
+        if not self.registered:
+            self.add_msg("You must register yourself with a nickname")
+            return
+        # TODO format and send message from client
+        # packet = Packet(self.username, msg)
+        # data = json.dumps(packet.__dict__)
+        # self.socket.send(data.encode())
 
     def add_msg(self, msg):
         self.view.add_msg(self.username, msg)
@@ -74,6 +75,7 @@ class IRCClient(Subscriber):
         self.loop.run_in_executor(None, self.listen_server)
 
     async def run(self):
+        self.connect()
         self.add_msg("Use command /nick to set your nickname")
 
     def listen_server(self):
@@ -83,9 +85,14 @@ class IRCClient(Subscriber):
                 self.view.add_msg("", "Connection terminated by server")
                 return
 
-            decoded = json.loads(server_input)
-            packet = Packet(**decoded)
-            self.view.add_msg(packet.username, packet.message)
+            human_msg = server_input[server_input[1:].find(":") + 2 :]
+            if not human_msg:
+                return
+            server_reply = server_input[1 : server_input[1:].find(":")]
+            if "001" in server_reply:
+                self.username = server_reply.split(" ")[2]
+                self.registered = True
+            self.view.add_msg(server_reply.split(" ")[0], human_msg)
 
     def close(self):
         logger.debug("Closing IRC Client object")
