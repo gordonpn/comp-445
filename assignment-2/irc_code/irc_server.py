@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import select
 import socket
@@ -49,30 +48,40 @@ class IRCServer(Publisher):
                         print(f"Client disconnected: {_socket.getpeername()}")
                         inputs.remove(_socket)
                         self.rm_subscriber(_socket.getpeername())
+                        rpl = (
+                            ":server PART #global :"
+                            f"{self.connected_users[_socket.getpeername()[1]]} has left."
+                        )
+                        print(rpl)
+                        self.notify(rpl)
+                        self.connected_users.pop(_socket.getpeername()[1], None)
                         _socket.close()
 
     def parse_msg_from_client(self, _socket, client_input):
-        print(f'Client on port: "{_socket.getpeername()[1]} {client_input}"')
+        print(f'Client on port {_socket.getpeername()[1]}: "{client_input}"')
+        rpl = ""
         if client_input.startswith("/nick"):
             nick = client_input.replace("/nick", "").strip()
-            print(f"{nick=}")
             if nick in self.connected_users.values():
-                _socket.send(f":server 433 * {nick} :Nickname already in use".encode())
+                rpl = f":server 433 * {nick} :Nickname already in use"
+                _socket.send(rpl.encode())
             else:
-                _socket.send(
-                    (
-                        f":server 001 {nick} :Welcome to the Internet Relay Network {nick}! "
-                        "You are connected to the #global channel."
-                    ).encode()
+                rpl = (
+                    f":server 001 {nick} :Welcome to the Internet Relay Network {nick}! "
+                    "You are connected to the #global channel."
                 )
+                print(rpl)
+                _socket.send(rpl.encode())
                 self.connected_users[_socket.getpeername()[1]] = nick
+                rpl = f":server JOIN #global :{nick} has joined #global."
+                self.notify(rpl)
         elif _socket.getpeername()[1] not in self.connected_users:
-            _socket.send(":server 431 * * :You have not set a nickname".encode())
-        # TODO parse if it's a public message
-        # decoded = json.loads(client_input)
-        # packet = Packet(**decoded)
-        # print(f"[{packet.username}]: {packet.message}")
-        # self.notify(packet)
+            rpl = ":server 431 * * :You have not set a nickname"
+            _socket.send(rpl.encode())
+        elif "PRIVMSG" in client_input:
+            rpl = f":{self.connected_users[_socket.getpeername()[1]]} {client_input}"
+            self.notify(rpl)
+        print(rpl)
 
     def close(self):
         self.socket.close()
@@ -84,8 +93,7 @@ class IRCSubscriber(Subscriber):
         self.address = address
 
     def update(self, msg):
-        data = json.dumps(msg.__dict__)
-        self._socket.send(data.encode())
+        self._socket.send(msg.encode())
 
 
 def main(port, host):

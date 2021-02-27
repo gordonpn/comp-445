@@ -23,9 +23,6 @@ logger = logging.getLogger()
 
 
 class IRCClient(Subscriber):
-    # TODO change how to parse the message receive according to RFC 1459
-    # TODO Proper initialization of IRC session
-    # TODO Appropriate server replies
     def __init__(self, port, server):
         super().__init__()
         self.username = str()
@@ -57,13 +54,7 @@ class IRCClient(Subscriber):
                 return
             self.socket.send(msg.lower().strip().encode())
             return
-        if not self.registered:
-            self.add_msg("You must register yourself with a nickname")
-            return
-        # TODO format and send message from client
-        # packet = Packet(self.username, msg)
-        # data = json.dumps(packet.__dict__)
-        # self.socket.send(data.encode())
+        self.socket.send(f"PRIVMSG #global :{msg}".encode())
 
     def add_msg(self, msg):
         self.view.add_msg(self.username, msg)
