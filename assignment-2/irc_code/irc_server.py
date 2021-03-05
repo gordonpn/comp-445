@@ -65,6 +65,9 @@ class IRCServer(Publisher):
             if nick in self.connected_users.values():
                 rpl = f":server 433 * {nick} :Nickname already in use"
                 _socket.send(rpl.encode())
+            elif len(nick) > 9:
+                rpl = f":server 432 * {nick} :Erroneous nickname"
+                _socket.send(rpl.encode())
             else:
                 rpl = (
                     f":server 001 {nick} :Welcome to the Internet Relay Network {nick}! "
