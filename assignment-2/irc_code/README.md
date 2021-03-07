@@ -50,13 +50,7 @@ The server handles nickname collisions by dropping the request, not allowing the
 
 This project uses Python 3.9.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.dev.txt
-```
-
-The above only installs useful developer dependencies. This project only uses the following standard libraries:
+This project only uses the following standard libraries:
 
 - abc
 - asyncio
