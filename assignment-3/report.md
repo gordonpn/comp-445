@@ -258,6 +258,8 @@ Please view `q2.pkt` with Cisco Packet Tracer.
 
 ### 3. Configure static routes and screenshot the routing table of each router
 
+Implemented in `q3.pkt`.
+
 R0 static routes:
 
 ![R0 static routes](./images/static-routes_router0.png)
@@ -286,8 +288,14 @@ R5 static routes:
 
 RIPv2 implemented in `q4.pkt`.
 
+All RIPv2 routing tables of all routers:
+
+![RIPv2 routing tables](./images/ripv2.png)
+
 ### 5. Implement an HTTP server
 
-HTTP server implemented in `q3.pkt`.
+HTTP server implemented in `http.pkt`.
 
 ### 6. Bonus: Configure RIPv2 and OSPF and include and configure a DNS server in your Cisco Packet Tracer simulation
+
+DNS server implemented in `dns.pkt`.
