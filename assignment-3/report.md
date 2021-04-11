@@ -256,6 +256,8 @@ Please view `q2.pkt` with Cisco Packet Tracer.
 | PC4     | FastEthernet0   | 172.16.6.2   | 255.255.255.128 | 172.16.6.1      |
 | Server0 | FastEthernet0   | 172.16.12.3  | 255.255.255.0   | 172.16.12.1     |
 
+![Network topology](./images/q2_topology.png)
+
 ### 3. Configure static routes and screenshot the routing table of each router
 
 Implemented in `q3.pkt`.
